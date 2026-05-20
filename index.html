@@ -1,0 +1,2531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automatic Weather Observation System</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #929bbe 0%, #14195a 100%);
+      color: #333;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 14px;
+      position: relative;
+      border-bottom: 3px solid #0a0b0c;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      display: grid;
+      grid-template-columns: 80px 1fr 280px;
+      gap: 10px;
+      align-items: center;
+      height: 80px;
+    }
+
+    .logo img {
+      height: 60px;
+      width: auto;
+    }
+
+    .title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);  
+      text-align: center;
+      width: max-content;
+    }
+
+    .title h1 {
+      font-size: 22px;
+      margin-bottom: 5px;
+      color: #0f1b35;
+    }
+
+    .header-data {
+      text-align: right;
+      font-size: 14px;
+      line-height: 1.5;
+      transform: translateX(280px);
+    }
+
+    main {
+      display: flex;
+      height: calc(100vh - 80px);
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 250px;
+      background: rgba(44, 62, 80, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 20px 0;
+      box-shadow: 4px 0 20px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      flex-shrink: 0;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    .sidebar ul {
+      list-style: none;
+    }
+
+    .sidebar li {
+      padding: 15px 25px;
+      cursor: pointer;
+      color: #ecf0f1;
+      transition: all 0.3s;
+      border-left: 4px solid transparent;
+      font-size: 16px;
+    }
+
+    .sidebar li:hover {
+      background: rgba(164, 183, 202, 0.8);
+      border-left-color: #3498db;
+    }
+
+    .sidebar li.active {
+      background: rgba(58, 71, 83, 0.8);
+      border-left-color: #3498db;
+      font-weight: bold;
+    }
+
+    .sidebar-info {
+      padding: 20px;
+      color: #ecf0f1;
+      font-size: 14px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+    } 
+
+    .sidebar-info div {
+      margin-bottom: 10px;
+    }
+
+    .content {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      height: 100%;
+    }
+
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 15px;
+    }
+
+    .left-column, .right-column {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .wind-sidebar {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 15px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .compass-container {
+      position: relative;
+      width: 190px;
+      height: 190px;
+      margin: 0 auto;
+    }
+
+    .compass {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #313c69 0%, #545a6b 100%);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 4px 8px rgba(255,255,255,0.2);
+      position: relative;
+    }
+
+    .compass::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 85%;
+      height: 85%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .compass-dir {
+      position: absolute;
+      font-weight: 700;
+      font-size: 15px;
+      color: #0b0b0b;
+    }
+
+    .compass-dir.n { top: 15px; left: 50%; transform: translateX(-50%); }
+    .compass-dir.e { right: 17px; top: 50%; transform: translateY(-50%); }
+    .compass-dir.s { bottom: 15px; left: 50%; transform: translateX(-50%); }
+    .compass-dir.w { left: 17px; top: 50%; transform: translateY(-50%); }
+
+    .compass-needle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 90px;
+      background: linear-gradient(to bottom, #e74c3c 0%, #e74c3c 50%, #ecf0f1 50%, #ecf0f1 100%);
+      transform-origin: center bottom;
+      transform: translate(-50%, -100%) rotate(0deg);
+      transition: transform 1s ease-out;
+      border-radius: 4px 4px 0 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .compass-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 18px;
+      height: 18px;
+      background: #becfe0;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      z-index: 10;
+    }
+
+    .wind-direction {
+      font-size: 22px;
+      font-weight: 600;
+      margin-top: 8px;
+      color: #1e3d73;
+    } 
+
+    .wind-sidebar h3 {
+      font-size: 11px;
+      color: #21212b;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .wind-speed-box {
+      font-size: 30px;
+      font-weight: 700;
+      color: #151a24;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 2px solid #e0e0e0;
+    }
+
+    .wind-speed-label {
+      font-size: 11px;
+      color: #21212b;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .wind-unit-select {
+      margin-top: 8px;
+    }
+
+    .wind-unit-select select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1e3d73;
+      background: white;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .wind-unit-select select:hover {
+      border-color: #3498db;
+    }
+
+    .wind-unit-select select:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+    }
+
+    .box {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 22px 16px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+      text-align: center;
+      min-height: 200px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border: 3px solid transparent;
+      transition: border-color 0.3s ease;
+    }
+
+    .box.threshold-exceeded {
+      border-color: #e74c3c;
+      box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3);
+    }
+
+    .box h3 {
+      font-size: 11px;
+      color: #21212b;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .box p {
+      font-size: 30px;
+      font-weight: 700;
+      color: #151a24;
+      margin-bottom: 8px;
+    }
+
+    .box-unit-select {
+      margin-top: 8px;
+    }
+
+    .box-unit-select select {
+      width: 100%;
+      max-width: 150px;
+      margin: 0 auto;
+      padding: 6px 8px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1e3d73;
+      background: white;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+
+    .box-unit-select select:hover {
+      border-color: #3498db;
+    }
+
+    .box-unit-select select:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+    }
+
+    .forecast-compact {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      padding: 15px;
+      margin-top: 15px;
+    }
+
+    .forecast-chart-container {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      padding: 20px;
+      margin-top: 15px;
+      height: 400px;
+    }
+
+    .forecast-chart-container canvas {
+      max-height: 350px;
+    }
+
+    .forecast-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .forecast-badge {
+      background: #3498db;
+      color: white;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+
+    .status-online {
+      background-color: #2ecc71;
+      box-shadow: 0 0 10px #2ecc71;
+    }
+
+    .status-offline {
+      background-color: #e74c3c;
+    }
+
+    .settings-section {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      padding: 25px;
+      margin-bottom: 20px;
+    }
+
+    .settings-section h3 {
+      color: #1e3d73;
+      margin-bottom: 20px;
+      font-size: 18px;
+      border-bottom: 2px solid #e0e0e0;
+      padding-bottom: 10px;
+    }
+
+    .settings-row {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 15px;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .settings-row label {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .settings-row input,
+    .settings-row select {
+      padding: 10px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+
+    .settings-row input:focus,
+    .settings-row select:focus {
+      outline: none;
+      border-color: #3498db;
+    }
+
+    .threshold-inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .threshold-inputs input {
+      padding: 8px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+    }
+
+    /* Sensor Offset Styles */
+    .offset-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .offset-card {
+      background: #f0f4fa;
+      border: 2px solid #d0daea;
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .offset-card label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1e3d73;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .offset-card .offset-unit {
+      font-size: 11px;
+      color: #888;
+      font-weight: 400;
+      margin-left: 4px;
+    }
+
+    .offset-input-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .offset-btn {
+      width: 28px;
+      height: 28px;
+      border: 2px solid #3498db;
+      background: white;
+      color: #3498db;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .offset-btn:hover {
+      background: #3498db;
+      color: white;
+    }
+
+    .offset-input-row input[type="number"] {
+      flex: 1;
+      min-width: 0;
+      padding: 5px 8px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
+      color: #1e3d73;
+      background: white;
+    }
+
+    .offset-input-row input[type="number"]:focus {
+      outline: none;
+      border-color: #3498db;
+    }
+
+    .offset-preview {
+      font-size: 11px;
+      color: #27ae60;
+      font-weight: 600;
+      min-height: 16px;
+    }
+
+    .offset-note {
+      background: #fffbe6;
+      border-left: 4px solid #f39c12;
+      padding: 10px 14px;
+      border-radius: 0 6px 6px 0;
+      font-size: 13px;
+      color: #7d6608;
+      margin-bottom: 16px;
+    }
+
+    .offset-reset-btn {
+      background: #95a5a6;
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-left: 12px;
+      transition: background 0.2s;
+    }
+
+    .offset-reset-btn:hover {
+      background: #7f8c8d;
+    }
+
+    .save-btn {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .save-btn:hover {
+      background: #2980b9;
+    }
+
+    .power-data-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .power-data-item {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .power-data-item .label {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    .power-data-item .value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1e3d73;
+    }
+
+    .download-btn {
+      background: #27ae60;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+      margin-left: 10px;
+    }
+
+    .download-btn:hover {
+      background: #229954;
+    }
+
+    .history-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .table-container {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+      overflow-x: auto;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .history-table thead {
+      background: #f8f9fa;
+      border-bottom: 2px solid #ddd;
+      position: sticky;
+      top: 0;
+    }
+
+    .history-table th {
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #1e3d73;
+      white-space: nowrap;
+    }
+
+    .history-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #eee;
+      color: #333;
+    }
+
+    .history-table tbody tr:hover {
+      background: rgba(52, 152, 219, 0.05);
+    }
+
+    /* Hidden columns styling */
+    .history-table .power-col {
+      display: none;
+    }
+    
+    .history-table.show-power-cols .power-col {
+      display: table-cell;
+    }
+
+    .toggle-columns-btn {
+      background: #27ae60;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-left: 10px;
+    }
+
+    .toggle-columns-btn:hover {
+      background: #229954;
+    }
+
+    .table-pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .pagination-btn {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .pagination-btn:hover {
+      background: #2980b9;
+    }
+
+    .pagination-btn:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
+    }
+
+    .pagination-info {
+      color: #999;
+      font-weight: 600;
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 30px;
+      color: #999;
+    }
+
+    .auth-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    .auth-modal.active {
+      display: flex;
+    }
+
+    .auth-container {
+      background: white;
+      border-radius: 12px;
+      padding: 40px;
+      width: 400px;
+      max-width: 90%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+
+    .auth-container h2 {
+      color: #1e3d73;
+      margin-bottom: 30px;
+      text-align: center;
+      font-size: 24px;
+    }
+
+    .auth-input-group {
+      margin-bottom: 20px;
+    }
+
+    .auth-input-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 600;
+    }
+
+    .auth-input-group input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .auth-input-group input:focus {
+      outline: none;
+      border-color: #3498db;
+    }
+
+    .auth-btn {
+      width: 100%;
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+      margin-top: 10px;
+    }
+
+    .auth-btn:hover {
+      background: #2980b9;
+    }
+
+    .auth-error {
+      color: #e74c3c;
+      text-align: center;
+      margin-top: 15px;
+      display: none;
+    }
+
+    .auth-error.active {
+      display: block;
+    }
+
+    .lock-icon {
+      display: inline-block;
+      margin-left: 5px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="auth-modal" id="auth-modal">
+    <div class="auth-container">
+      <h2>🔒 Settings Access</h2>
+      <div class="auth-input-group">
+        <label for="auth-username">Username</label>
+        <input type="text" id="auth-username" placeholder="Enter username">
+      </div>
+      <div class="auth-input-group">
+        <label for="auth-password">Password</label>
+        <input type="password" id="auth-password" placeholder="Enter password">
+      </div>
+      <button class="auth-btn" onclick="authenticate()">Login</button>
+      <button class="auth-btn" style="background: #95a5a6; margin-top: 10px;" onclick="closeAuthModal()">Cancel</button>
+      <div class="auth-error" id="auth-error">Invalid credentials. Please try again.</div>
+    </div>
+  </div>
+
+  <header>
+    <div class="logo">
+      <img src="logo_large.png" alt="Airport Logo" onerror="this.style.display='none'">
+    </div>
+    <div class="title">
+      <h1>Automatic Weather Observation System</h1>
+    </div>
+    <div class="header-data">
+      <div><strong>VCCC</strong><br>Colombo International Airport Rathmalana</div>
+    </div>
+  </header>
+
+  <main>
+    <div class="sidebar">
+      <ul>
+        <li class="active" data-page="realtime">Dashboard</li>
+        <li data-page="forecast">Wind Forecast</li>
+        <li data-page="history">History</li>
+        <li data-page="settings">Settings <span class="lock-icon">🔒</span></li>
+      </ul>
+      <div class="sidebar-info">
+        <div><strong>Location:</strong> <span id="sidebar-location">--</span></div>
+        <div><strong>Local Time:</strong> <span id="sidebar-localtime">--</span></div>
+        <div><strong>Power Mode:</strong> <span id="sidebar-powermode">--</span></div>
+        <div><strong>Data Interval:</strong> 5 minutes</div>
+        <div><strong>Status:</strong> <span class="status-indicator status-offline" id="status-indicator"></span><span id="connection-status">Connecting...</span></div>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Real-Time Page -->
+      <div id="realtime" class="page active">
+        <div class="forecast-compact" style="margin-bottom: 10px;">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; text-align: center;">
+            <div>
+              <p style="font-size: 15px; color: #666; text-transform: uppercase; margin-bottom: 5px;">Runway</p>
+              <p style="font-size: 20px; font-weight: 700; color: #1e3d73;" id="runway-display">22 END</p>
+            </div>
+            <div>
+              <p style="font-size: 15px; color: #666; text-transform: uppercase; margin-bottom: 5px;">UTC Time</p>
+              <p style="font-size: 20px; font-weight: 700; color: #1e3d73;" id="header-utc-time">--:--:--</p>
+            </div>
+            <div>
+              <p style="font-size: 15px; color: #666; text-transform: uppercase; margin-bottom: 5px;">UTC Date</p>
+              <p style="font-size: 20px; font-weight: 700; color: #1e3d73;" id="header-utc-date">----</p>
+            </div>  
+          </div>
+        </div>
+
+        <div class="dashboard-layout">
+          <div class="left-column">
+            <div class="box" id="box-temperature">
+              <h3>Temperature</h3>
+              <p id="rt-temperature">-- °C</p>
+              <div class="box-unit-select">
+                <select id="temp-unit" onchange="updateDisplayUnits()">
+                  <option value="celsius">Celsius (°C)</option>
+                  <option value="fahrenheit">Fahrenheit (°F)</option>
+                </select>
+              </div>
+            </div>
+            <div class="box" id="box-humidity">
+              <h3>Humidity</h3>
+              <p id="rt-humidity">-- %</p>
+            </div>
+          </div>
+
+          <div class="wind-sidebar">
+            <h3>Wind Direction</h3>
+            <div class="compass-container">
+              <div class="compass">
+                <span class="compass-dir n">N</span>
+                <span class="compass-dir e">E</span>
+                <span class="compass-dir s">S</span>
+                <span class="compass-dir w">W</span>
+                <div class="compass-needle" id="rt-compass-needle"></div>
+                <div class="compass-center"></div>
+              </div>
+            </div>
+            <p class="wind-direction" id="rt-wind-dir-text">--</p>
+            <div class="wind-speed-box">
+              <div class="wind-speed-label">Wind Speed</div>
+              <p id="rt-wind-speed">-- kt</p>
+              <div class="wind-unit-select">
+                <select id="wind-unit" onchange="updateDisplayUnits()">
+                  <option value="knots" selected>Knots (kt)</option>
+                  <option value="ms">Meters/sec (m/s)</option>
+                  <option value="mph">Miles/hr (mph)</option>
+                  <option value="kmh">Kilometers/hr (km/h)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="right-column">
+            <div class="box" id="box-pressure">
+              <h3>Pressure</h3>
+              <p id="rt-pressure">-- hPa</p>
+              <div class="box-unit-select">
+                <select id="pressure-unit" onchange="updateDisplayUnits()">
+                  <option value="hpa" selected>Hectopascal (hPa)</option>
+                  <option value="inhg">Inches Hg (inHg)</option>
+                  <option value="mbar">Millibar (mbar)</option>
+                  <option value="kpa">Kilopascal (kPa)</option>
+                </select>
+              </div>
+            </div>
+            <div class="box" id="box-dewpoint">
+              <h3>Dew Point</h3>
+              <p id="rt-dew-point">-- °C</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="forecast-compact">
+          <h4>Quick Forecast Summary</h4>
+          <p id="forecast-text">Loading forecast data...</p>
+        </div>
+      </div>
+
+      <!-- Wind Forecast Page -->
+      <div id="forecast" class="page">
+        <div class="forecast-compact" style="margin-bottom: 15px;">
+          <div class="forecast-info">
+            <div>
+              <h2 style="margin: 0; color: #1e3d73;">2-Hour Wind Forecast</h2>
+              <p style="color: #666; font-size: 14px; margin-top: 5px;">ML-based prediction using 4 hours historical data (5-min intervals)</p>
+            </div>
+            <div>
+              <span class="forecast-badge" id="forecast-model-badge">RF-SVR Model</span>
+              <p style="font-size: 12px; color: #666; margin-top: 5px;">Updated: <span id="forecast-update-time">--</span></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="forecast-chart-container">
+          <canvas id="windSpeedChart"></canvas>
+        </div>
+
+        <div class="forecast-chart-container">
+          <canvas id="windDirectionChart"></canvas>
+        </div>
+
+        <div class="forecast-compact">
+          <h4>Forecast Analysis</h4>
+          <div id="forecast-analysis" style="margin-top: 10px;">
+            <p>Loading analysis...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- History Page -->
+      <div id="history" class="page">
+        <div class="history-controls">
+          <div>
+            <h2 style="color:#ecf0f1; margin: 0;">30-Day Weather History</h2>
+            <p style="color: #bdc3c7; font-size: 13px; margin-top: 5px;">Data logged every 5 minutes (Latest records shown first)</p>
+          </div>
+          <div>
+            <label style="color: #ecf0f1; margin-right: 10px;">
+              Select Date:
+              <input type="date" id="date-select" style="margin-left: 5px; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+            </label>
+            <button class="toggle-columns-btn" onclick="togglePowerColumns()">Show Power Data</button>
+            <button class="download-btn" onclick="downloadExcelByDate()">Download Excel</button>
+          </div>
+        </div>
+        <div style="color: #ecf0f1; margin-bottom: 10px; font-size: 13px;">
+          Last download: <span id="last-download-time">Never</span>
+        </div>
+        <div class="table-container">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>UTC Date</th>
+                <th>UTC Time</th>
+                <th>Local Time</th>
+                <th>Temp (°C)</th>
+                <th>Humidity (%)</th>
+                <th>Pressure (hPa)</th>
+                <th>Wind Spd (kt)</th>
+                <th>Wind Dir (°)</th>
+                <th>Dew Pt (°C)</th>
+                <th class="power-col">Voltage (V)</th>
+                <th class="power-col">Current (A)</th>
+                <th class="power-col">Power (W)</th>
+                <th class="power-col">Power Status</th>
+                <th class="power-col">Comm Mode</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody">
+              <tr><td colspan="14" class="no-data">Loading data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-pagination">
+          <button class="pagination-btn" id="prev-btn" onclick="previousPage()">Previous</button>
+          <span class="pagination-info">
+            Page <span id="current-page">1</span> of <span id="total-pages">1</span>
+            (<span id="total-records">0</span> records)
+          </span>
+          <button class="pagination-btn" id="next-btn" onclick="nextPage()">Next</button>
+        </div>
+      </div>
+
+      <!-- Settings Page (keeping your original settings) -->
+      <div id="settings" class="page">
+        <h2 style="color:#ecf0f1; margin-bottom: 20px;">System Settings & Information</h2>
+        
+        <div class="settings-section">
+          <h3>Runway Configuration</h3>
+          <div class="settings-row">
+            <label for="runway-select">Select Runway End:</label>
+            <select id="runway-select">
+              <option value="22 END">22 END</option>
+              <option value="MIDDLE FIELD">MIDDLE FIELD</option>
+              <option value="04 END">04 END</option>
+            </select>
+          </div>
+          <button class="save-btn" onclick="saveRunwaySettings()">Save Runway Settings</button>
+        </div>
+
+        <div class="settings-section">
+          <h3>Power System Status</h3>
+          <div class="power-data-grid">
+            <div class="power-data-item">
+              <div class="label">Voltage</div>
+              <div class="value" id="settings-voltage">-- V</div>
+            </div>
+            <div class="power-data-item">
+              <div class="label">Current</div>
+              <div class="value" id="settings-current">-- A</div>
+            </div>
+            <div class="power-data-item">
+              <div class="label">Power</div>
+              <div class="value" id="settings-power">-- W</div>
+            </div>
+          </div>
+          <div class="settings-row" style="margin-top: 20px;">
+            <label>Communication Mode:</label>
+            <div style="font-size: 18px; font-weight: 600; color: #1e3d73;" id="settings-commmode">--</div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>Weather Data Thresholds (Alarm)</h3>
+          <p style="font-size: 13px; color: #666; margin-bottom: 15px;">
+            *Ensure that the weather data units on the dashboard are set to the default units (°C, kt, hPa) before adjusting the threshold settings.
+          </p>
+          
+          <div class="settings-row">
+            <label for="temp-min">Temperature (<span id="threshold-temp-unit">°C</span>):</label>
+            <div class="threshold-inputs">
+              <input type="number" id="temp-min" placeholder="Min" step="0.1">
+              <input type="number" id="temp-max" placeholder="Max" step="0.1">
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <label for="humidity-min">Humidity (%):</label>
+            <div class="threshold-inputs">
+              <input type="number" id="humidity-min" placeholder="Min" step="0.1">
+              <input type="number" id="humidity-max" placeholder="Max" step="0.1">
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <label for="pressure-min">Pressure (<span id="threshold-pressure-unit">hPa/</span>):</label>
+            <div class="threshold-inputs">
+              <input type="number" id="pressure-min" placeholder="Min" step="0.1">
+              <input type="number" id="pressure-max" placeholder="Max" step="0.1">
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <label for="dewpoint-min">Dew Point (<span id="threshold-dewpoint-unit">°C</span>):</label>
+            <div class="threshold-inputs">
+              <input type="number" id="dewpoint-min" placeholder="Min" step="0.1">
+              <input type="number" id="dewpoint-max" placeholder="Max" step="0.1">
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <label for="windspeed-min">Wind Speed (<span id="threshold-windspeed-unit">kt</span>):</label>
+            <div class="threshold-inputs">
+              <input type="number" id="windspeed-min" placeholder="Min" step="0.1">
+              <input type="number" id="windspeed-max" placeholder="Max" step="0.1">
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <label for="winddir-min">Wind Direction (°):</label>
+            <div class="threshold-inputs">
+              <input type="number" id="winddir-min" placeholder="Min" step="1" min="0" max="360">
+              <input type="number" id="winddir-max" placeholder="Max" step="1" min="0" max="360">
+            </div>
+          </div>
+
+          <button class="save-btn" onclick="saveThresholdSettings()">Save Threshold Settings</button>
+        </div>
+
+        <!-- Sensor Offset Section -->
+        <div class="settings-section">
+          <h3>Sensor Offset Adjustments</h3>
+          <div class="offset-note">
+            ⚠️ Offsets are applied in <strong>base units</strong> (°C, m/s, hPa, °) and affect both the dashboard display and data logging. Use positive values to increase readings, negative to decrease.
+          </div>
+
+          <div class="offset-grid">
+            <!-- Temperature -->
+            <div class="offset-card">
+              <label>Temperature <span class="offset-unit">(°C)</span></label>
+              <div class="offset-input-row">
+                <button class="offset-btn" onclick="stepOffset('temperature', -0.1)">−</button>
+                <input type="number" id="offset-temperature" value="0" step="0.1" onchange="previewOffset('temperature')">
+                <button class="offset-btn" onclick="stepOffset('temperature', 0.1)">+</button>
+              </div>
+              <div class="offset-preview" id="preview-temperature"></div>
+            </div>
+
+            <!-- Humidity -->
+            <div class="offset-card">
+              <label>Humidity <span class="offset-unit">(%)</span></label>
+              <div class="offset-input-row">
+                <button class="offset-btn" onclick="stepOffset('humidity', -0.1)">−</button>
+                <input type="number" id="offset-humidity" value="0" step="0.1" onchange="previewOffset('humidity')">
+                <button class="offset-btn" onclick="stepOffset('humidity', 0.1)">+</button>
+              </div>
+              <div class="offset-preview" id="preview-humidity"></div>
+            </div>
+
+            <!-- Pressure -->
+            <div class="offset-card">
+              <label>Pressure <span class="offset-unit">(hPa)</span></label>
+              <div class="offset-input-row">
+                <button class="offset-btn" onclick="stepOffset('pressure', -0.1)">−</button>
+                <input type="number" id="offset-pressure" value="0" step="0.1" onchange="previewOffset('pressure')">
+                <button class="offset-btn" onclick="stepOffset('pressure', 0.1)">+</button>
+              </div>
+              <div class="offset-preview" id="preview-pressure"></div>
+            </div>
+
+            <!-- Dew Point -->
+            <div class="offset-card">
+              <label>Dew Point <span class="offset-unit">(°C)</span></label>
+              <div class="offset-input-row">
+                <button class="offset-btn" onclick="stepOffset('dewPoint', -0.1)">−</button>
+                <input type="number" id="offset-dewPoint" value="0" step="0.1" onchange="previewOffset('dewPoint')">
+                <button class="offset-btn" onclick="stepOffset('dewPoint', 0.1)">+</button>
+              </div>
+              <div class="offset-preview" id="preview-dewPoint"></div>
+            </div>
+
+            <!-- Wind Speed -->
+            <div class="offset-card">
+              <label>Wind Speed <span class="offset-unit">(m/s)</span></label>
+              <div class="offset-input-row">
+                <button class="offset-btn" onclick="stepOffset('windSpeed', -0.1)">−</button>
+                <input type="number" id="offset-windSpeed" value="0" step="0.1" onchange="previewOffset('windSpeed')">
+                <button class="offset-btn" onclick="stepOffset('windSpeed', 0.1)">+</button>
+              </div>
+              <div class="offset-preview" id="preview-windSpeed"></div>
+            </div>
+
+            <!-- Wind Direction -->
+            <div class="offset-card">
+              <label>Wind Direction <span class="offset-unit">(°)</span></label>
+              <div class="offset-input-row">
+                <button class="offset-btn" onclick="stepOffset('windDirection', -1)">−</button>
+                <input type="number" id="offset-windDirection" value="0" step="1" onchange="previewOffset('windDirection')">
+                <button class="offset-btn" onclick="stepOffset('windDirection', 1)">+</button>
+              </div>
+              <div class="offset-preview" id="preview-windDirection"></div>
+            </div>
+          </div>
+
+          <button class="save-btn" onclick="saveOffsetSettings()">Save Offset Settings</button>
+          <button class="offset-reset-btn" onclick="resetOffsets()">Reset All to 0</button>
+        </div>
+
+        <div class="settings-section">
+          <h3>Authentication Settings</h3>
+          <div class="settings-row">
+            <label for="new-username">Change Username:</label>
+            <input type="text" id="new-username" placeholder="New username">
+          </div>
+          <div class="settings-row">
+            <label for="new-password">Change Password:</label>
+            <input type="password" id="new-password" placeholder="New password">
+          </div>
+          <button class="save-btn" onclick="changeCredentials()">Update Credentials</button>
+        </div>
+
+        <div class="settings-section">
+          <h3>Connection Information</h3>
+          <div class="settings-row">
+            <label>Server URL:</label>
+            <div id="server-url">http://localhost:3000</div>
+          </div>
+          <div class="settings-row">
+            <label>Update Interval:</label>
+            <div>5 seconds (display) | 5 minutes (logging)</div>
+          </div>
+          <div class="settings-row">
+            <label>Data Points:</label>
+            <div id="data-points">0</div>
+          </div>
+          <div class="settings-row">
+            <label>Forecast Ready:</label>
+            <div id="forecast-ready-status">--</div>
+          </div>
+          <div class="settings-row">
+            <label>Server Uptime:</label>
+            <div id="server-uptime">--</div>
+          </div>
+          <div class="settings-row">
+            <button class="save-btn" style="background: #e74c3c; margin-left: 0;" onclick="logout()">Logout</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const API_URL = window.location.origin;
+    let globalHistoryData = [];
+    let globalForecastData = null;
+    let windSpeedChart = null;
+    let windDirectionChart = null;
+    let currentPage = 1;
+    const recordsPerPage = 20;
+    let isAuthenticated = false;
+    let authCredentials = {
+      username: 'admin',
+      password: 'admin123'
+    };
+
+    // Unit preferences (for display only, data stored in original units)
+    let unitPreferences = {
+      temperature: 'celsius',
+      windSpeed: 'knots',
+      pressure: 'hpa'
+    };
+
+    // Sensor offsets – stored & applied in base units (°C, m/s, hPa, °)
+    let sensorOffsets = {
+      temperature: 0,
+      humidity: 0,
+      pressure: 0,
+      dewPoint: 0,
+      windSpeed: 0,
+      windDirection: 0
+    };
+
+    // Last raw data from server (used for offset preview)
+    let lastRawData = null;
+
+    function applyOffsets(data) {
+      // Returns a new object with offsets applied (never mutates raw data)
+      return {
+        ...data,
+        temperature:   (data.temperature   || 0) + sensorOffsets.temperature,
+        humidity:      (data.humidity      || 0) + sensorOffsets.humidity,
+        pressure:      (data.pressure      || 0) + sensorOffsets.pressure,
+        dewPoint:      (data.dewPoint      || 0) + sensorOffsets.dewPoint,
+        windSpeed:     Math.max(0, (data.windSpeed  || 0) + sensorOffsets.windSpeed),
+        windDirection: ((data.windDirection || 0) + sensorOffsets.windDirection + 360) % 360
+      };
+    }
+
+    function loadOffsetPreferences() {
+      const saved = localStorage.getItem('sensorOffsets');
+      if (saved) {
+        sensorOffsets = { ...sensorOffsets, ...JSON.parse(saved) };
+      }
+      // Populate inputs
+      Object.keys(sensorOffsets).forEach(key => {
+        const el = document.getElementById('offset-' + key);
+        if (el) el.value = sensorOffsets[key];
+      });
+    }
+
+    window.saveOffsetSettings = function() {
+      ['temperature','humidity','pressure','dewPoint','windSpeed','windDirection'].forEach(key => {
+        const el = document.getElementById('offset-' + key);
+        if (el) sensorOffsets[key] = parseFloat(el.value) || 0;
+      });
+      localStorage.setItem('sensorOffsets', JSON.stringify(sensorOffsets));
+      // Sync to server so logging and Excel export also use the offsets
+      fetch(`${API_URL}/api/offsets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sensorOffsets)
+      }).then(r => r.json()).then(result => {
+        if (result.success) {
+          alert('✅ Sensor offset settings saved!\n\nOffsets are now applied to all display, logging, and Excel exports.');
+        } else {
+          alert('⚠️ Offsets saved locally but server sync failed: ' + (result.error || 'Unknown error'));
+        }
+      }).catch(() => {
+        alert('✅ Offsets saved locally.\n⚠️ Could not sync to server — server may be offline.');
+      });
+    };
+
+    window.resetOffsets = function() {
+      if (!confirm('Reset all offsets to 0?')) return;
+      Object.keys(sensorOffsets).forEach(key => { sensorOffsets[key] = 0; });
+      localStorage.setItem('sensorOffsets', JSON.stringify(sensorOffsets));
+      fetch(`${API_URL}/api/offsets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sensorOffsets)
+      }).catch(() => {});
+      loadOffsetPreferences();
+      // Clear previews
+      ['temperature','humidity','pressure','dewPoint','windSpeed','windDirection'].forEach(key => {
+        const p = document.getElementById('preview-' + key);
+        if (p) p.textContent = '';
+      });
+      alert('All offsets reset to 0.');
+    };
+
+    async function syncOffsetsFromServer() {
+      try {
+        const r = await fetch(`${API_URL}/api/offsets`);
+        if (!r.ok) return;
+        const serverOffsets = await r.json();
+        // Server is authoritative — merge into local state and update inputs
+        sensorOffsets = { ...sensorOffsets, ...serverOffsets };
+        localStorage.setItem('sensorOffsets', JSON.stringify(sensorOffsets));
+        Object.keys(sensorOffsets).forEach(key => {
+          const el = document.getElementById('offset-' + key);
+          if (el) el.value = sensorOffsets[key];
+        });
+        console.log('📐 Offsets synced from server:', sensorOffsets);
+      } catch (e) {
+        // Server offline — fall back to localStorage (already loaded)
+      }
+    }
+
+    window.stepOffset = function(key, step) {
+      const el = document.getElementById('offset-' + key);
+      if (!el) return;
+      const decimals = (step % 1 !== 0) ? 1 : 0;
+      el.value = (parseFloat(el.value || 0) + step).toFixed(decimals);
+      previewOffset(key);
+    };
+
+    window.previewOffset = function(key) {
+      if (!lastRawData) return;
+      const el = document.getElementById('offset-' + key);
+      const preview = document.getElementById('preview-' + key);
+      if (!el || !preview) return;
+      const newOffset = parseFloat(el.value) || 0;
+      const currentOffset = sensorOffsets[key] || 0;
+      // lastRawData already has currentOffset applied by server.
+      // Raw sensor value = lastRawData[field] - currentOffset
+      // New adjusted value = rawSensor + newOffset
+      let field, unit;
+      switch(key) {
+        case 'temperature':  field = 'temperature';   unit = '°C';  break;
+        case 'humidity':     field = 'humidity';      unit = '%';   break;
+        case 'pressure':     field = 'pressure';      unit = ' hPa'; break;
+        case 'dewPoint':     field = 'dewPoint';      unit = '°C';  break;
+        case 'windSpeed':    field = 'windSpeed';     unit = ' m/s'; break;
+        case 'windDirection':field = 'windDirection'; unit = '°';   break;
+        default: return;
+      }
+      const serverVal = parseFloat(lastRawData[field]) || 0;
+      const rawSensor = serverVal - currentOffset;
+      const newAdjusted = key === 'windSpeed'
+        ? Math.max(0, rawSensor + newOffset)
+        : key === 'windDirection'
+          ? ((rawSensor + newOffset) + 360) % 360
+          : rawSensor + newOffset;
+      if (newOffset === 0) {
+        preview.textContent = '';
+      } else {
+        preview.textContent = `${rawSensor.toFixed(key === 'windDirection' ? 0 : 1)}${unit} → ${newAdjusted.toFixed(key === 'windDirection' ? 0 : 1)}${unit}`;
+      }
+    };
+
+    // Unit conversion functions
+    function convertTemperature(celsius, toUnit) {
+      if (toUnit === 'fahrenheit') {
+        return (celsius * 9/5 + 32).toFixed(1);
+      }
+      return celsius.toFixed(1);
+    }
+
+    function convertWindSpeed(ms, toUnit) {
+      switch(toUnit) {
+        case 'knots':
+          return (ms * 1.94384).toFixed(1);
+        case 'mph':
+          return (ms * 2.23694).toFixed(1);
+        case 'kmh':
+          return (ms * 3.6).toFixed(1);
+        case 'ms':
+          return ms.toFixed(1);
+        default:
+          return (ms * 1.94384).toFixed(1); // default to knots
+      }
+    }
+
+    function convertPressure(hpa, toUnit) {
+      switch(toUnit) {
+        case 'inhg':
+          return (hpa * 0.02953).toFixed(2);
+        case 'mbar':
+          return hpa.toFixed(1); // hPa and mbar are equivalent
+        case 'kpa':
+          return (hpa / 10).toFixed(1);
+        case 'hpa':
+        default:
+          return hpa.toFixed(1);
+      }
+    }
+
+    // Reverse conversion functions (from display units to base units)
+    function temperatureToBase(value, fromUnit) {
+      const val = parseFloat(value);
+      if (fromUnit === 'fahrenheit') {
+        return (val - 32) * 5/9;  // F to C
+      }
+      return val;  // Already in C
+    }
+
+    function windSpeedToBase(value, fromUnit) {
+      const val = parseFloat(value);
+      switch(fromUnit) {
+        case 'knots':
+          return val / 1.94384;  // knots to m/s
+        case 'mph':
+          return val / 2.23694;  // mph to m/s
+        case 'kmh':
+          return val / 3.6;      // km/h to m/s
+        case 'ms':
+          return val;            // already m/s
+        default:
+          return val / 1.94384;  // default from knots
+      }
+    }
+
+    function pressureToBase(value, fromUnit) {
+      const val = parseFloat(value);
+      switch(fromUnit) {
+        case 'inhg':
+          return val / 0.02953;  // inHg to hPa
+        case 'mbar':
+          return val;            // mbar = hPa
+        case 'kpa':
+          return val * 10;       // kPa to hPa
+        case 'hpa':
+        default:
+          return val;            // already hPa
+      }
+    }
+
+    function getUnitLabel(type) {
+      switch(type) {
+        case 'temperature':
+          return unitPreferences.temperature === 'celsius' ? '°C' : '°F';
+        case 'windSpeed':
+          switch(unitPreferences.windSpeed) {
+            case 'knots': return 'kt';
+            case 'mph': return 'mph';
+            case 'kmh': return 'km/h';
+            case 'ms': return 'm/s';
+            default: return 'kt';
+          }
+        case 'pressure':
+          switch(unitPreferences.pressure) {
+            case 'hpa': return 'hPa';
+            case 'inhg': return 'inHg';
+            case 'mbar': return 'mbar';
+            case 'kpa': return 'kPa';
+            default: return 'hPa';
+          }
+        default:
+          return '';
+      }
+    }
+
+    // Update display units when user changes preferences
+    function updateDisplayUnits() {
+      unitPreferences.temperature = document.getElementById('temp-unit').value;
+      unitPreferences.windSpeed = document.getElementById('wind-unit').value;
+      unitPreferences.pressure = document.getElementById('pressure-unit').value;
+      
+      // Save preferences
+      localStorage.setItem('unitPreferences', JSON.stringify(unitPreferences));
+      
+      // Re-fetch and update display with new units
+      fetchLatestData();
+      
+      // Update forecast charts if on forecast page
+      if (globalForecastData && globalForecastData.forecast) {
+        updateWindForecastCharts(globalForecastData);
+      }
+      
+      // Update threshold settings display if on settings page
+      const settingsPage = document.getElementById('settings');
+      if (settingsPage.classList.contains('active')) {
+        applySettings();  // Re-display thresholds in new units
+      }
+    }
+
+    // New function to update forecast charts with current unit preferences
+    function updateWindForecastCharts(data) {
+      if (!data.forecast) return;
+      updateForecastCharts(data);
+      updateForecastAnalysis(data);
+      generateQuickForecast(data);
+    }
+
+    // Load unit preferences from localStorage
+    function loadUnitPreferences() {
+      const saved = localStorage.getItem('unitPreferences');
+      if (saved) {
+        unitPreferences = JSON.parse(saved);
+        document.getElementById('temp-unit').value = unitPreferences.temperature;
+        document.getElementById('wind-unit').value = unitPreferences.windSpeed;
+        document.getElementById('pressure-unit').value = unitPreferences.pressure;
+      }
+    }
+
+    function generateQuickForecast(data) {
+      if (!data || !data.forecast || !data.forecast.windSpeed) {
+        document.getElementById('forecast-text').textContent = 'No forecast data available.';
+        return;
+      }
+      
+      const windSpeeds = data.forecast.windSpeed;
+      const windDirections = data.forecast.windDirection;
+      
+      // Calculate average in current unit
+      const avgSpeedMs = windSpeeds.reduce((sum, v) => sum + parseFloat(v), 0) / windSpeeds.length;
+      const avgSpeed = convertWindSpeed(avgSpeedMs, unitPreferences.windSpeed);
+      const windUnit = getUnitLabel('windSpeed');
+      
+      const avgDir = (windDirections.reduce((sum, v) => sum + parseFloat(v), 0) / windDirections.length).toFixed(0);
+      const dirCardinal = degreesToCardinal(parseFloat(avgDir));
+      
+      // Determine thresholds based on unit (converting from knots thresholds)
+      let lightThreshold, moderateThreshold, strongThreshold;
+      switch(unitPreferences.windSpeed) {
+        case 'ms':
+          lightThreshold = 2.5; moderateThreshold = 7.5; strongThreshold = 12.5;
+          break;
+        case 'mph':
+          lightThreshold = 6; moderateThreshold = 17; strongThreshold = 29;
+          break;
+        case 'kmh':
+          lightThreshold = 9; moderateThreshold = 28; strongThreshold = 46;
+          break;
+        case 'knots':
+        default:
+          lightThreshold = 5; moderateThreshold = 15; strongThreshold = 25;
+      }
+      
+      let forecast = '';
+      const speed = parseFloat(avgSpeed);
+      
+      if (speed < lightThreshold) {
+        forecast = `Light winds from ${dirCardinal} expected (avg ${avgSpeed} ${windUnit}). Ideal conditions for flight operations.`;
+      } else if (speed < moderateThreshold) {
+        forecast = `Moderate winds from ${dirCardinal} expected (avg ${avgSpeed} ${windUnit}). Standard operating conditions.`;
+      } else if (speed < strongThreshold) {
+        forecast = `Strong winds from ${dirCardinal} expected (avg ${avgSpeed} ${windUnit}). Exercise caution during takeoff and landing.`;
+      } else {
+        forecast = `Very strong winds from ${dirCardinal} expected (avg ${avgSpeed} ${windUnit}). Consider crosswind limitations.`;
+      }
+      
+      document.getElementById('forecast-text').textContent = forecast;
+    }
+
+    let settings = {
+      runway: '22 END',
+      thresholds: {
+        // Thresholds stored in BASE units (°C, m/s, hPa, °C for dewpoint)
+        temperature: { min: -10, max: 45 },  // °C
+        humidity: { min: 0, max: 100 },      // %
+        pressure: { min: 950, max: 1050 },   // hPa
+        dewpoint: { min: -20, max: 35 },     // °C
+        windspeed: { min: 0, max: 25.72 },   // m/s (50 knots converted)
+        winddir: { min: 0, max: 360 }        // degrees
+      }
+    };
+
+    // Authentication functions
+    function loadCredentials() {
+      const saved = window.authCredentialsData;
+      if (saved) {
+        authCredentials = saved;
+      }
+    }
+
+    function saveCredentials() {
+      window.authCredentialsData = authCredentials;
+    }
+
+    function showAuthModal() {
+      document.getElementById('auth-modal').classList.add('active');
+      document.getElementById('auth-error').classList.remove('active');
+      document.getElementById('auth-username').value = '';
+      document.getElementById('auth-password').value = '';
+      document.getElementById('auth-username').focus();
+    }
+
+    window.closeAuthModal = function() {
+      document.getElementById('auth-modal').classList.remove('active');
+      const dashboardTab = document.querySelector('.sidebar li[data-page="realtime"]');
+      dashboardTab.click();
+    }
+
+    window.authenticate = function() {
+      const username = document.getElementById('auth-username').value;
+      const password = document.getElementById('auth-password').value;
+
+      if (username === authCredentials.username && password === authCredentials.password) {
+        isAuthenticated = true;
+        document.getElementById('auth-modal').classList.remove('active');
+        document.getElementById('auth-error').classList.remove('active');
+        
+        const menuItems = document.querySelectorAll('.sidebar li');
+        const pages = document.querySelectorAll('.page');
+        
+        menuItems.forEach(i => i.classList.remove('active'));
+        document.querySelector('.sidebar li[data-page="settings"]').classList.add('active');
+        
+        pages.forEach(p => p.classList.remove('active'));
+        document.getElementById('settings').classList.add('active');
+      } else {
+        document.getElementById('auth-error').classList.add('active');
+        document.getElementById('auth-password').value = '';
+        document.getElementById('auth-password').focus();
+      }
+    }
+
+    window.changeCredentials = function() {
+      const newUsername = document.getElementById('new-username').value.trim();
+      const newPassword = document.getElementById('new-password').value.trim();
+
+      if (!newUsername || !newPassword) {
+        alert('Please enter both username and password');
+        return;
+      }
+
+      if (newUsername.length < 3) {
+        alert('Username must be at least 3 characters');
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        alert('Password must be at least 6 characters');
+        return;
+      }
+
+      authCredentials.username = newUsername;
+      authCredentials.password = newPassword;
+      saveCredentials();
+
+      document.getElementById('new-username').value = '';
+      document.getElementById('new-password').value = '';
+
+      alert('Credentials updated successfully!\nNew Username: ' + newUsername);
+    }
+
+    window.logout = function() {
+      if (confirm('Are you sure you want to logout?')) {
+        isAuthenticated = false;
+        
+        const menuItems = document.querySelectorAll('.sidebar li');
+        const pages = document.querySelectorAll('.page');
+        
+        menuItems.forEach(i => i.classList.remove('active'));
+        document.querySelector('.sidebar li[data-page="realtime"]').classList.add('active');
+        
+        pages.forEach(p => p.classList.remove('active'));
+        document.getElementById('realtime').classList.add('active');
+        
+        alert('You have been logged out successfully.');
+      }
+    }
+
+    // Settings functions
+    function loadSettings() {
+      const saved = window.settingsData;
+      if (saved) {
+        settings = saved;
+      }
+      applySettings();
+    }
+
+    function saveSettings() {
+      window.settingsData = settings;
+    }
+
+    function applySettings() {
+      document.getElementById('runway-select').value = settings.runway;
+      document.getElementById('runway-display').textContent = settings.runway;
+      
+      // Update threshold unit labels
+      const tempUnit = getUnitLabel('temperature');
+      const windUnit = getUnitLabel('windSpeed');
+      const pressureUnit = getUnitLabel('pressure');
+      
+      document.getElementById('threshold-temp-unit').textContent = tempUnit.replace('°', '');
+      document.getElementById('threshold-dewpoint-unit').textContent = tempUnit.replace('°', '');
+      document.getElementById('threshold-windspeed-unit').textContent = windUnit;
+      document.getElementById('threshold-pressure-unit').textContent = pressureUnit;
+      
+      // Convert thresholds from base units to current display units
+      // Temperature (base: °C)
+      const tempMin = convertTemperature(settings.thresholds.temperature.min, unitPreferences.temperature);
+      const tempMax = convertTemperature(settings.thresholds.temperature.max, unitPreferences.temperature);
+      document.getElementById('temp-min').value = tempMin;
+      document.getElementById('temp-max').value = tempMax;
+      
+      // Humidity (no conversion needed)
+      document.getElementById('humidity-min').value = settings.thresholds.humidity.min;
+      document.getElementById('humidity-max').value = settings.thresholds.humidity.max;
+      
+      // Pressure (base: hPa)
+      const pressMin = convertPressure(settings.thresholds.pressure.min, unitPreferences.pressure);
+      const pressMax = convertPressure(settings.thresholds.pressure.max, unitPreferences.pressure);
+      document.getElementById('pressure-min').value = pressMin;
+      document.getElementById('pressure-max').value = pressMax;
+      
+      // Dew Point (base: °C)
+      const dewMin = convertTemperature(settings.thresholds.dewpoint.min, unitPreferences.temperature);
+      const dewMax = convertTemperature(settings.thresholds.dewpoint.max, unitPreferences.temperature);
+      document.getElementById('dewpoint-min').value = dewMin;
+      document.getElementById('dewpoint-max').value = dewMax;
+      
+      // Wind Speed (base: m/s)
+      const windMin = convertWindSpeed(settings.thresholds.windspeed.min, unitPreferences.windSpeed);
+      const windMax = convertWindSpeed(settings.thresholds.windspeed.max, unitPreferences.windSpeed);
+      document.getElementById('windspeed-min').value = windMin;
+      document.getElementById('windspeed-max').value = windMax;
+      
+      // Wind Direction (no conversion needed)
+      document.getElementById('winddir-min').value = settings.thresholds.winddir.min;
+      document.getElementById('winddir-max').value = settings.thresholds.winddir.max;
+    }
+
+    window.saveRunwaySettings = function() {
+      settings.runway = document.getElementById('runway-select').value;
+      document.getElementById('runway-display').textContent = settings.runway;
+      saveSettings();
+      alert('Runway settings saved successfully!');
+    }
+
+    window.saveThresholdSettings = function() {
+      // Get values from inputs (in current display units)
+      const tempMin = parseFloat(document.getElementById('temp-min').value);
+      const tempMax = parseFloat(document.getElementById('temp-max').value);
+      const humMin = parseFloat(document.getElementById('humidity-min').value);
+      const humMax = parseFloat(document.getElementById('humidity-max').value);
+      const pressMin = parseFloat(document.getElementById('pressure-min').value);
+      const pressMax = parseFloat(document.getElementById('pressure-max').value);
+      const dewMin = parseFloat(document.getElementById('dewpoint-min').value);
+      const dewMax = parseFloat(document.getElementById('dewpoint-max').value);
+      const windMin = parseFloat(document.getElementById('windspeed-min').value);
+      const windMax = parseFloat(document.getElementById('windspeed-max').value);
+      const dirMin = parseFloat(document.getElementById('winddir-min').value);
+      const dirMax = parseFloat(document.getElementById('winddir-max').value);
+      
+      // Convert from display units to base units for storage
+      settings.thresholds = {
+        temperature: {
+          min: temperatureToBase(tempMin, unitPreferences.temperature),
+          max: temperatureToBase(tempMax, unitPreferences.temperature)
+        },
+        humidity: {
+          min: humMin || 0,
+          max: humMax || 100
+        },
+        pressure: {
+          min: pressureToBase(pressMin, unitPreferences.pressure),
+          max: pressureToBase(pressMax, unitPreferences.pressure)
+        },
+        dewpoint: {
+          min: temperatureToBase(dewMin, unitPreferences.temperature),
+          max: temperatureToBase(dewMax, unitPreferences.temperature)
+        },
+        windspeed: {
+          min: windSpeedToBase(windMin, unitPreferences.windSpeed),
+          max: windSpeedToBase(windMax, unitPreferences.windSpeed)
+        },
+        winddir: {
+          min: dirMin || 0,
+          max: dirMax || 360
+        }
+      };
+      
+      saveSettings();
+      
+      // Show units in the alert message
+      const tempUnit = getUnitLabel('temperature');
+      const windUnit = getUnitLabel('windSpeed');
+      const pressUnit = getUnitLabel('pressure');
+      
+      alert(`Threshold settings saved successfully!\n\nValues entered in:\n- Temperature: ${tempUnit}\n- Wind Speed: ${windUnit}\n- Pressure: ${pressUnit}\n\nStored in base units: °C, m/s, hPa`);
+    }
+
+    function checkThreshold(value, threshold) {
+      return value < threshold.min || value > threshold.max;
+    }
+
+    function updateThresholdIndicators(data) {
+      // All comparisons are now in BASE units (°C, m/s, hPa)
+      // since both data and thresholds are in base units
+      
+      const tempBox = document.getElementById('box-temperature');
+      if (checkThreshold(data.temperature, settings.thresholds.temperature)) {
+        tempBox.classList.add('threshold-exceeded');
+      } else {
+        tempBox.classList.remove('threshold-exceeded');
+      }
+
+      const humBox = document.getElementById('box-humidity');
+      if (checkThreshold(data.humidity, settings.thresholds.humidity)) {
+        humBox.classList.add('threshold-exceeded');
+      } else {
+        humBox.classList.remove('threshold-exceeded');
+      }
+
+      const pressBox = document.getElementById('box-pressure');
+      if (checkThreshold(data.pressure, settings.thresholds.pressure)) {
+        pressBox.classList.add('threshold-exceeded');
+      } else {
+        pressBox.classList.remove('threshold-exceeded');
+      }
+
+      const dewBox = document.getElementById('box-dewpoint');
+      if (checkThreshold(data.dewPoint, settings.thresholds.dewpoint)) {
+        dewBox.classList.add('threshold-exceeded');
+      } else {
+        dewBox.classList.remove('threshold-exceeded');
+      }
+
+      // Wind speed: both data and threshold are in m/s (base units)
+      const windBox = document.querySelector('.wind-sidebar');
+      if (checkThreshold(data.windSpeed, settings.thresholds.windspeed)) {
+        windBox.style.border = '3px solid #e74c3c';
+        windBox.style.boxShadow = '0 8px 32px rgba(231, 76, 60, 0.3)';
+      } else {
+        windBox.style.border = 'none';
+        windBox.style.boxShadow = '0 8px 32px rgba(0,0,0,0.1)';
+      }
+    }
+
+    // Wind forecast functions
+    async function fetchWindForecast() {
+      try {
+        const response = await fetch(`${API_URL}/api/weather/forecast`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        
+        const data = await response.json();
+        
+        // Check if forecast is available
+        if (!data.success || data.error) {
+          console.log('Forecast not available:', data.error || 'No forecast data');
+          document.getElementById('forecast-text').textContent = 
+            data.error || 'Forecast requires at least 4 hours of data (48 records at 5-min intervals).';
+          return;
+        }
+        
+        globalForecastData = data;
+        updateForecastCharts(data);
+        updateForecastAnalysis(data);
+        
+        const updateTime = new Date().toLocaleTimeString();
+        document.getElementById('forecast-update-time').textContent = updateTime;
+        
+        // Set model badge based on response
+        const modelText = data.models ? 
+          `${data.models.windSpeed.split(' ')[0]}-${data.models.windDirection.split(' ')[0]}` : 
+          'ML Model';
+        document.getElementById('forecast-model-badge').textContent = modelText;
+        
+        generateQuickForecast(data);
+        
+      } catch (error) {
+        console.error('Error fetching forecast:', error);
+        document.getElementById('forecast-text').textContent = 'Unable to load forecast. Please try again later.';
+      }
+    }
+
+    function updateForecastCharts(data) {
+      if (!data.forecast) return;
+      
+      const labels = data.forecast.times || [];
+      const windSpeedData = data.forecast.windSpeed || [];
+      const windDirectionData = data.forecast.windDirection || [];
+
+      // Convert wind speeds based on user preference
+      const convertedWindSpeeds = windSpeedData.map(ms => 
+        parseFloat(convertWindSpeed(ms, unitPreferences.windSpeed))
+      );
+      
+      const windUnit = getUnitLabel('windSpeed');
+
+      // Wind Speed Chart
+      const wsCtx = document.getElementById('windSpeedChart');
+      if (windSpeedChart) {
+        windSpeedChart.destroy();
+      }
+      
+      windSpeedChart = new Chart(wsCtx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `Predicted Wind Speed (${windUnit})`,
+            data: convertedWindSpeeds,
+            borderColor: '#3498db',
+            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+            tension: 0.4,
+            fill: true,
+            pointRadius: 3,
+            pointHoverRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Wind Speed Forecast - Next 2 Hours',
+              font: { size: 16, weight: 'bold' }
+            },
+            legend: { display: true }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: `Speed (${windUnit})` }
+            },
+            x: {
+              title: { display: true, text: 'Time' }
+            }
+          }
+        }
+      });
+
+      // Wind Direction Chart
+      const wdCtx = document.getElementById('windDirectionChart');
+      if (windDirectionChart) {
+        windDirectionChart.destroy();
+      }
+      
+      windDirectionChart = new Chart(wdCtx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Predicted Wind Direction (°)',
+            data: windDirectionData.map(v => parseFloat(v)),
+            borderColor: '#e74c3c',
+            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+            tension: 0.4,
+            fill: true,
+            pointRadius: 3,
+            pointHoverRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Wind Direction Forecast - Next 2 Hours',
+              font: { size: 16, weight: 'bold' }
+            },
+            legend: { display: true }
+          },
+          scales: {
+            y: {
+              min: 0,
+              max: 360,
+              title: { display: true, text: 'Direction (degrees)' },
+              ticks: {
+                callback: function(value) {
+                  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N'];
+                  const idx = Math.round(value / 45);
+                  return value + '° (' + (dirs[idx] || '') + ')';
+                }
+              }
+            },
+            x: {
+              title: { display: true, text: 'Time' }
+            }
+          }
+        }
+      });
+    }
+
+    function updateForecastAnalysis(data) {
+      if (!data.forecast) return;
+      
+      const windSpeeds = data.forecast.windSpeed;
+      const directions = data.forecast.windDirection.map(v => parseFloat(v));
+      
+      // Convert wind speeds to current unit
+      const speeds = windSpeeds.map(ms => parseFloat(convertWindSpeed(ms, unitPreferences.windSpeed)));
+      const windUnit = getUnitLabel('windSpeed');
+      
+      const avgSpeed = (speeds.reduce((a, b) => a + b, 0) / speeds.length).toFixed(1);
+      const maxSpeed = Math.max(...speeds).toFixed(1);
+      const minSpeed = Math.min(...speeds).toFixed(1);
+      
+      const avgDir = (directions.reduce((a, b) => a + b, 0) / directions.length).toFixed(0);
+      const maxDir = Math.max(...directions).toFixed(0);
+      const minDir = Math.min(...directions).toFixed(0);
+      
+      const dirCardinal = degreesToCardinal(parseFloat(avgDir));
+      
+      // Determine thresholds based on current unit
+      let lightThreshold, moderateThreshold, strongThreshold;
+      switch(unitPreferences.windSpeed) {
+        case 'ms':
+          lightThreshold = 7.5; moderateThreshold = 12.5;
+          break;
+        case 'mph':
+          lightThreshold = 17; moderateThreshold = 29;
+          break;
+        case 'kmh':
+          lightThreshold = 28; moderateThreshold = 46;
+          break;
+        case 'knots':
+        default:
+          lightThreshold = 15; moderateThreshold = 25;
+      }
+      
+      let analysis = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div>
+            <h5 style="color: #1e3d73; margin-bottom: 10px;">Wind Speed Analysis</h5>
+            <p><strong>Average:</strong> ${avgSpeed} ${windUnit}</p>
+            <p><strong>Maximum:</strong> ${maxSpeed} ${windUnit}</p>
+            <p><strong>Minimum:</strong> ${minSpeed} ${windUnit}</p>
+            <p style="margin-top: 10px; color: #666;">
+              ${parseFloat(maxSpeed) > moderateThreshold ? '⚠️ Strong winds expected' : 
+                parseFloat(maxSpeed) > lightThreshold ? '⚡ Moderate winds expected' : 
+                '✅ Light winds expected'}
+            </p>
+          </div>
+          <div>
+            <h5 style="color: #1e3d73; margin-bottom: 10px;">Wind Direction Analysis</h5>
+            <p><strong>Average:</strong> ${avgDir}° (${dirCardinal})</p>
+            <p><strong>Range:</strong> ${minDir}° - ${maxDir}°</p>
+            <p><strong>Variation:</strong> ${(parseFloat(maxDir) - parseFloat(minDir)).toFixed(0)}°</p>
+            <p style="margin-top: 10px; color: #666;">
+              ${Math.abs(parseFloat(maxDir) - parseFloat(minDir)) > 45 ? 
+                '⚠️ Variable wind direction' : 
+                '✅ Steady wind direction'}
+            </p>
+          </div>
+        </div>
+        <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+          <p style="font-size: 14px; color: #555;">
+            <strong>Forecast Generated:</strong> ${new Date().toLocaleString()} | 
+            <strong>Models:</strong> ${data.models ? `${data.models.windSpeed} + ${data.models.windDirection}` : 'ML Model'} | 
+            <strong>Input Records:</strong> ${data.dataPoints || 48} | 
+            <strong>Horizon:</strong> ${data.forecastHorizon || '2 hours'}
+          </p>
+        </div>
+      `;
+      
+      document.getElementById('forecast-analysis').innerHTML = analysis;
+    }
+
+    function generateQuickForecast(data) {
+      if (!data || !data.forecast || !data.forecast.windSpeed || !data.forecast.windDirection) {
+        document.getElementById('forecast-text').textContent = 'No forecast data available.';
+        return;
+      }
+      
+      const avgSpeed = (data.forecast.windSpeed.reduce((sum, v) => sum + parseFloat(v), 0) / data.forecast.windSpeed.length * 1.94384).toFixed(1);
+      const avgDir = (data.forecast.windDirection.reduce((sum, v) => sum + parseFloat(v), 0) / data.forecast.windDirection.length).toFixed(0);
+      const dirCardinal = degreesToCardinal(parseFloat(avgDir));
+      
+      let forecast = '';
+      
+      if (parseFloat(avgSpeed) < 5) {
+        forecast = `Light winds from ${dirCardinal} expected (avg ${avgSpeed} kt). Ideal conditions for flight operations.`;
+      } else if (parseFloat(avgSpeed) < 15) {
+        forecast = `Moderate winds from ${dirCardinal} expected (avg ${avgSpeed} kt). Standard operating conditions.`;
+      } else if (parseFloat(avgSpeed) < 25) {
+        forecast = `Strong winds from ${dirCardinal} expected (avg ${avgSpeed} kt). Exercise caution during takeoff and landing.`;
+      } else {
+        forecast = `Very strong winds from ${dirCardinal} expected (avg ${avgSpeed} kt). Consider crosswind limitations.`;
+      }
+      
+      document.getElementById('forecast-text').textContent = forecast;
+    }
+
+    // Data fetching functions
+    function degreesToCardinal(degrees) {
+      const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+      return dirs[Math.round(((degrees % 360) / 22.5)) % 16];
+    }
+
+    function updateWind(deg) {
+      const needle = document.getElementById('rt-compass-needle');
+      needle.style.transform = `translate(-50%, -100%) rotate(${deg}deg)`;
+      document.getElementById('rt-wind-dir-text').textContent = degreesToCardinal(deg) + ' (' + deg + '°)';
+    }
+
+    function updateConnectionStatus(connected, errorMsg = '') {
+      const indicator = document.getElementById('status-indicator');
+      const statusText = document.getElementById('connection-status');
+      
+      if (connected) {
+        indicator.classList.remove('status-offline');
+        indicator.classList.add('status-online');
+        statusText.textContent = 'Online';
+        statusText.title = 'Connected - Last update: ' + new Date().toLocaleTimeString();
+      } else {
+        indicator.classList.remove('status-online');
+        indicator.classList.add('status-offline');
+        statusText.textContent = 'Offline';
+        statusText.title = errorMsg || 'Cannot connect to weather station';
+      }
+    }
+
+    async function fetchLatestData() {
+      try {
+        // Add timeout to detect connection issues faster
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        const response = await fetch(`${API_URL}/api/weather/latest`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) throw new Error('Network response was not ok');
+        
+        const data = await response.json();
+
+        // Store raw data for offset preview (server already applied offsets)
+        lastRawData = data;
+        const displayData = data;
+        
+        // Check if ESP32 is actually connected based on data age
+        const isConnected = data.dataAge !== undefined && data.dataAge < 30; // Data less than 30 seconds old
+        const statusMsg = data.connectionStatus || 'Unknown';
+        
+        updateConnectionStatus(isConnected, statusMsg);
+        
+        // Convert and display temperature (with offset applied)
+        const tempUnit = getUnitLabel('temperature');
+        if (data.temperature === 0 || data.temperature === null || data.temperature === undefined) {
+          document.getElementById('rt-temperature').textContent = 'N/A';
+        } else {
+          const tempValue = convertTemperature(displayData.temperature, unitPreferences.temperature);
+          document.getElementById('rt-temperature').textContent = tempValue + ' ' + tempUnit;
+        }
+        
+        // Humidity (with offset applied)
+        if (data.humidity === 0 || data.humidity === null || data.humidity === undefined) {
+          document.getElementById('rt-humidity').textContent = 'N/A';
+        } else {
+          document.getElementById('rt-humidity').textContent = displayData.humidity.toFixed(1) + ' %';
+        }
+        
+        // Convert and display pressure (with offset applied)
+        const pressureUnit = getUnitLabel('pressure');
+        if (data.pressure === 0 || data.pressure === null || data.pressure === undefined) {
+          document.getElementById('rt-pressure').textContent = 'N/A';
+        } else {
+          const pressureValue = convertPressure(displayData.pressure, unitPreferences.pressure);
+          document.getElementById('rt-pressure').textContent = pressureValue + ' ' + pressureUnit;
+        }
+        
+        // Convert and display dew point
+        if (data.dewPoint === 0 || data.dewPoint === null || data.dewPoint === undefined) {
+          document.getElementById('rt-dew-point').textContent = 'N/A';
+        } else {
+          const dewValue = convertTemperature(displayData.dewPoint, unitPreferences.temperature);
+          document.getElementById('rt-dew-point').textContent = dewValue + ' ' + tempUnit;
+        }
+        
+        // Convert and display wind speed (with offset applied, in m/s)
+        const windValue = convertWindSpeed(displayData.windSpeed, unitPreferences.windSpeed);
+        const windUnit = getUnitLabel('windSpeed');
+        document.getElementById('rt-wind-speed').textContent = windValue + ' ' + windUnit;
+        
+        updateWind(displayData.windDirection);
+        
+        document.getElementById('header-utc-time').textContent = data.utcTime;
+        document.getElementById('header-utc-date').textContent = data.utcDate;
+        
+        document.getElementById('sidebar-location').textContent = `${data.latitude}, ${data.longitude}`;
+        document.getElementById('sidebar-localtime').textContent = data.localTime;
+        document.getElementById('sidebar-powermode').textContent = data.powerStatus;
+        
+        document.getElementById('settings-voltage').textContent = data.voltage.toFixed(2) + ' V';
+        document.getElementById('settings-current').textContent = data.current.toFixed(2) + ' A';
+        document.getElementById('settings-power').textContent = data.power.toFixed(2) + ' W';
+        document.getElementById('settings-commmode').textContent = data.commMode;
+        
+        updateThresholdIndicators(displayData);
+        
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        const errorMsg = error.name === 'AbortError' ? 'Server timeout - Check connection' : error.message;
+        updateConnectionStatus(false, errorMsg);
+      }
+    }
+
+    function displayHistoryTable() {
+      const tbody = document.getElementById('history-tbody');
+      const totalPages = Math.ceil(globalHistoryData.length / recordsPerPage);
+      const start = (currentPage - 1) * recordsPerPage;
+      const end = start + recordsPerPage;
+      const pageData = globalHistoryData.slice(start, end);
+
+      if (pageData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="14" class="no-data">No data available</td></tr>';
+        document.getElementById('total-records').textContent = '0';
+        document.getElementById('current-page').textContent = '1';
+        document.getElementById('total-pages').textContent = '1';
+        return;
+      }
+
+      // Get unit labels
+      const tempUnit = getUnitLabel('temperature');
+      const windUnit = getUnitLabel('windSpeed');
+      const pressureUnit = getUnitLabel('pressure');
+
+      tbody.innerHTML = pageData.map(record => {
+        // Server already applied offsets — just convert units for display
+        const r = record;
+        const temp = convertTemperature(r.temperature, unitPreferences.temperature);
+        const dewPoint = convertTemperature(r.dewPoint, unitPreferences.temperature);
+        const windSpeed = convertWindSpeed(r.windSpeed, unitPreferences.windSpeed);
+        const pressure = convertPressure(r.pressure, unitPreferences.pressure);
+        
+        return `
+        <tr>
+          <td>${record.utcDate}</td>
+          <td>${record.utcTime}</td>
+          <td>${record.localTime}</td>
+          <td>${temp} ${tempUnit}</td>
+          <td>${r.humidity.toFixed(1)}</td>
+          <td>${pressure} ${pressureUnit}</td>
+          <td>${windSpeed} ${windUnit}</td>
+          <td>${r.windDirection.toFixed(0)}</td>
+          <td>${dewPoint} ${tempUnit}</td>
+          <td class="power-col">${parseFloat(record.voltage).toFixed(2)}</td>
+          <td class="power-col">${parseFloat(record.current).toFixed(2)}</td>
+          <td class="power-col">${parseFloat(record.power).toFixed(2)}</td>
+          <td class="power-col">${record.powerStatus}</td>
+          <td class="power-col">${record.commMode}</td>
+        </tr>
+      `}).join('');
+
+      // Update table headers with current units
+      const headers = document.querySelectorAll('.history-table thead th');
+      headers[3].textContent = `Temp (${tempUnit})`;
+      headers[5].textContent = `Pressure (${pressureUnit})`;
+      headers[6].textContent = `Wind Spd (${windUnit})`;
+      headers[8].textContent = `Dew Pt (${tempUnit})`;
+
+      document.getElementById('total-records').textContent = globalHistoryData.length;
+      document.getElementById('current-page').textContent = currentPage;
+      document.getElementById('total-pages').textContent = totalPages;
+      document.getElementById('prev-btn').disabled = currentPage === 1;
+      document.getElementById('next-btn').disabled = currentPage === totalPages;
+    }
+
+    window.nextPage = function() {
+      const totalPages = Math.ceil(globalHistoryData.length / recordsPerPage);
+      if (currentPage < totalPages) {
+        currentPage++;
+        displayHistoryTable();
+      }
+    }
+
+    window.previousPage = function() {
+      if (currentPage > 1) {
+        currentPage--;
+        displayHistoryTable();
+      }
+    }
+
+    async function loadHistoryData() {
+      try {
+        const response = await fetch(`${API_URL}/api/weather/history`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        
+        const data = await response.json();
+        // Reverse the data to show latest first
+        globalHistoryData = data.reverse();
+        currentPage = 1;
+        displayHistoryTable();
+        
+      } catch (error) {
+        console.error('Error loading history:', error);
+        document.getElementById('history-tbody').innerHTML = '<tr><td colspan="14" class="no-data">Error loading data</td></tr>';
+      }
+    }
+
+    async function fetchHealthData() {
+      try {
+        const response = await fetch(`${API_URL}/api/health`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        
+        const data = await response.json();
+        document.getElementById('data-points').textContent = data.dataPoints;
+        
+        const hours = Math.floor(data.uptime / 3600);
+        const minutes = Math.floor((data.uptime % 3600) / 60);
+        document.getElementById('server-uptime').textContent = `${hours}h ${minutes}m`;
+        
+        const forecastReady = data.forecastAvailable ? 
+          '✅ Yes (48+ records available)' : 
+          `⚠️ No (need ${48 - data.dataPoints} more records)`;
+        document.getElementById('forecast-ready-status').textContent = forecastReady;
+        
+      } catch (error) {
+        console.error('Error fetching health data:', error);
+      }
+    }
+
+    // Initialize date input with default value
+    function initializeDateInputs() {
+      const today = new Date();
+      
+      const dateSelect = document.getElementById('date-select');
+      
+      if (dateSelect) {
+        dateSelect.value = today.toISOString().split('T')[0];
+        dateSelect.max = today.toISOString().split('T')[0];
+      }
+    }
+
+    // Toggle power columns visibility
+    window.togglePowerColumns = function() {
+      const table = document.querySelector('.history-table');
+      const button = event.target;
+      
+      if (table.classList.contains('show-power-cols')) {
+        table.classList.remove('show-power-cols');
+        button.textContent = 'Show Power Data';
+      } else {
+        table.classList.add('show-power-cols');
+        button.textContent = 'Hide Power Data';
+      }
+    }
+
+    // Replace the downloadExcelByDate function with this improved version
+
+     // Add this at the very start of downloadExcelByDate()
+    async function downloadExcelByDate() {
+      try {
+        const selectedDate = document.getElementById('date-select').value;
+
+        const response = await fetch(`${API_URL}/api/weather/download-excel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: selectedDate })
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error);
+        }
+
+        // PYWEBVIEW FIX
+        if (window.pywebview && window.pywebview.api) {
+          console.log('Using PyWebView API for download');
+          const saveResult = await window.pywebview.api.save_excel_file(
+            result.filename,
+            result.data
+          );
+
+          if (saveResult.success) {
+            alert(`✅ File saved to:\n${saveResult.filepath}`);
+            return;
+          }
+        }
+
+      } catch (error) {
+        console.error('Excel download failed:', error);
+        alert('❌ Failed to download Excel file');
+      }
+    }
+
+    // Navigation menu handling
+    const menuItems = document.querySelectorAll('.sidebar li');
+    const pages = document.querySelectorAll('.page');
+    menuItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const pageId = item.dataset.page;
+        
+        if (pageId === 'settings' && !isAuthenticated) {
+          showAuthModal();
+          return;
+        }
+        
+        menuItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        
+        pages.forEach(p => p.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        
+        if (pageId === 'history') {
+          loadHistoryData();
+        } else if (pageId === 'forecast') {
+          fetchWindForecast();
+        }
+      });
+    });
+
+    // Keyboard shortcuts for auth modal
+    document.addEventListener('DOMContentLoaded', function() {
+      const authPassword = document.getElementById('auth-password');
+      const authUsername = document.getElementById('auth-username');
+      
+      if (authPassword) {
+        authPassword.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            authenticate();
+          }
+        });
+      }
+      
+      if (authUsername) {
+        authUsername.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            document.getElementById('auth-password').focus();
+          }
+        });
+      }
+    });
+
+    // Initialize application
+    document.getElementById('server-url').textContent = API_URL;
+    loadCredentials();
+    loadSettings();
+    loadUnitPreferences();  // Load saved unit preferences
+    loadOffsetPreferences(); // Load saved sensor offsets (localStorage fallback)
+    syncOffsetsFromServer(); // Sync offsets from server (authoritative source)
+    initializeDateInputs();
+    
+    // Initial data fetch
+    fetchLatestData();
+    fetchHealthData();
+    fetchWindForecast();
+    
+    // Update intervals
+    setInterval(fetchLatestData, 5000);  // Every 5 seconds for display
+    setInterval(fetchHealthData, 30000);  // Every 30 seconds
+    setInterval(fetchWindForecast, 300000);  // Every 5 minutes for forecast
+    
+    console.log('🔐 Default credentials: Username: admin, Password: admin123');
+    console.log('⏱️  Data logging: Every 5 minutes');
+    console.log('🔮 Wind forecast: Updated every 5 minutes');
+    console.log('📊 Unit conversions: Display only, data stored in original units (°C, m/s, hPa)');
+  </script>
+</body>
+</html>
